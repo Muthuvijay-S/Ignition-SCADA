@@ -1,0 +1,14 @@
+db = 'sga_tw_ovens'
+ 
+disp = system.db.runQuery('show create table sim_simulation',db)
+
+print(disp[0][1])
+
+
+
+tables = system.db.runQuery('show tables')
+for table in tables : 
+    print table[0]
+    ddl = system.db.runQuery("show create table %s " %(table[0]))
+    print ddl[0][1]
+    print '-----------------------'
