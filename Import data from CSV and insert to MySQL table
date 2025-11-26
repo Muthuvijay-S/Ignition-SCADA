@@ -1,0 +1,86 @@
+import csv
+import system.dataset
+
+# Ask user to select CSV file
+path = system.file.openFile("csv")
+
+# Read CSV content as string
+stringData = system.file.readFileAsString(path)
+
+# Parse CSV string into rows
+rows = list(csv.reader(stringData.splitlines()))
+headers = rows[0]
+data_rows = rows[1:]
+
+# Create Ignition dataset
+data = system.dataset.toDataSet(headers, data_rows)
+
+# SQL insert with upsert
+sql = """
+    INSERT INTO PlantData (
+        Plant, MaterialNum, MakerType, Component, ComponentDesc,
+        GritCode, Speed, WeightMaker, Gravity_SAND, WeightGravity,
+        UCOAT, WeightUCOAT, UCOAT2, WeightUCOAT2, ConveyorSpeed,
+        GravityDefault, UCOATDefault, UCOAT2Default
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+        MakerType = VALUES(MakerType),
+        Component = VALUES(Component),
+        ComponentDesc = VALUES(ComponentDesc),
+        GritCode = VALUES(GritCode),
+        Speed = VALUES(Speed),
+        WeightMaker = VALUES(WeightMaker),
+        Gravity_SAND = VALUES(Gravity_SAND),
+        WeightGravity = VALUES(WeightGravity),
+        UCOAT = VALUES(UCOAT),
+        WeightUCOAT = VALUES(WeightUCOAT),
+        UCOAT2 = VALUES(UCOAT2),
+        WeightUCOAT2 = VALUES(WeightUCOAT2),
+        ConveyorSpeed = VALUES(ConveyorSpeed),
+        GravityDefault = VALUES(GravityDefault),
+        UCOATDefault = VALUES(UCOATDefault),
+        UCOAT2Default = VALUES(UCOAT2Default)
+"""
+
+# Numeric columns index list (0-based)
+numeric_columns = [6,7,8,9,10,11,12,13,14,15,16,17]
+
+def is_number(val):
+    try:
+        float(val)
+        return True
+    except:
+        return False
+
+inserted_count = 0
+failed_rows = []
+
+for rowIndex in range(data.getRowCount()):
+    raw_params = [data.getValueAt(rowIndex, colIndex) for colIndex in range(data.getColumnCount())]
+    cleaned_params = []
+    
+    for i, val in enumerate(raw_params):
+        if val is None or str(val).strip() == '' or str(val).strip().upper() == 'NULL':
+            cleaned_params.append(None)
+        elif i in numeric_columns:
+            if is_number(val):
+                cleaned_params.append(float(val))
+            else:
+                cleaned_params.append(None)
+        else:
+            cleaned_params.append(val)
+    
+    try:
+        system.db.runPrepUpdate(sql, cleaned_params)
+        inserted_count += 1
+    except Exception as e:
+        # Log failed rows for later review but continue loop
+        failed_rows.append((rowIndex, e))
+
+# Show summary message
+msg = "Insert/update finished.\nSuccessful: {}\nFailed: {}".format(inserted_count, len(failed_rows))
+if failed_rows:
+    msg += "\nFailed rows:\n" + "\n".join(["Row {}: {}".format(r[0], r[1]) for r in failed_rows])
+
+system.gui.messageBox(msg)
