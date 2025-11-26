@@ -1,0 +1,6 @@
+	for rowIndex in range(dataDS.getRowCount()):
+	    print "Row", rowIndex
+	    for colIndex in range(dataDS.getColumnCount()):
+	        colName = dataDS.getColumnName(colIndex)
+	        value = dataDS.getValueAt(rowIndex, colIndex)
+	        print "  {}: {}".format(colName, value)
